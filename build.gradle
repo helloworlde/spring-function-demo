@@ -1,0 +1,94 @@
+buildscript {
+    ext {
+        springBootVersion = '2.2.0.M2'
+        wrapperVersion = '1.0.21.RELEASE'
+        shadowVersion = '4.0.4'
+    }
+    repositories {
+        mavenLocal()
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+        mavenCentral()
+        maven { url 'https://repo.spring.io/snapshot' }
+        maven { url 'https://repo.spring.io/milestone' }
+    }
+    dependencies {
+        classpath("org.springframework.boot.experimental:spring-boot-thin-gradle-plugin:${wrapperVersion}")
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+        classpath "com.github.jengelman.gradle.plugins:shadow:${shadowVersion}"
+    }
+}
+apply plugin: 'java'
+apply plugin: 'maven'
+apply plugin: "com.github.johnrengelman.shadow"
+apply plugin: 'io.spring.dependency-management'
+apply plugin: "org.springframework.boot"
+apply plugin: 'org.springframework.boot.experimental.thin-launcher'
+
+group = 'io.spring.sample'
+version = '2.0.0.RELEASE'
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { url "https://repo.spring.io/snapshot" }
+    maven { url "https://repo.spring.io/milestone" }
+}
+
+ext {
+    springCloudVersion = "Greenwich.BUILD-SNAPSHOT"
+    springCloudFunctionVersion = "2.1.0.RELEASE"
+    awsLambdaEventsVersion = "2.2.6"
+    awsLambdaCoreVersion = "1.1.0"
+}
+
+ext['reactor.version'] = "3.1.7.RELEASE"
+
+assemble.dependsOn = [shadowJar, thinJar]
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'example.Config'
+    }
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+    }
+}
+
+import com.github.jengelman.gradle.plugins.shadow.transformers.*
+
+shadowJar {
+    classifier = 'aws'
+    dependencies {
+        exclude(
+                dependency("org.springframework.cloud:spring-cloud-function-web:${springCloudFunctionVersion}"))
+    }
+    // Required for Spring
+    mergeServiceFiles()
+    append 'META-INF/spring.handlers'
+    append 'META-INF/spring.schemas'
+    append 'META-INF/spring.tooling'
+    transform(PropertiesFileTransformer) {
+        paths = ['META-INF/spring.factories']
+        mergeStrategy = "append"
+    }
+}
+
+configurations {
+    testCompile.extendsFrom(compileOnly)
+}
+
+dependencies {
+    compile 'org.springframework.cloud:spring-cloud-starter-function-web:2.1.0.RELEASE'
+    compile 'org.springframework.cloud:spring-cloud-function-adapter-aws'
+
+    compileOnly("com.amazonaws:aws-lambda-java-events:${awsLambdaEventsVersion}")
+    compileOnly("com.amazonaws:aws-lambda-java-core:${awsLambdaCoreVersion}")
+    testCompile('org.springframework.boot:spring-boot-starter-test')
+}
